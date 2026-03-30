@@ -724,7 +724,7 @@
       <div class="section">
         <div class="grid-toggle">
           <label class="toggle-switch">
-            <input type="checkbox" id="latGridToggle" onchange="updateGrid()">
+            <input type="checkbox" id="latGridToggle" onchange="onToggleGrid('lat')">
             <span class="toggle-slider"></span>
           </label>
           <span class="toggle-label">위도 격자</span>
@@ -745,7 +745,7 @@
       <div class="section">
         <div class="grid-toggle">
           <label class="toggle-switch">
-            <input type="checkbox" id="lngGridToggle" onchange="updateGrid()">
+            <input type="checkbox" id="lngGridToggle" onchange="onToggleGrid('lng')">
             <span class="toggle-slider"></span>
           </label>
           <span class="toggle-label">경도 격자</span>
@@ -885,8 +885,7 @@ let markers = [];
 let coordData = []; // { lat, lng }
 let currentCoord = null;
 let gridLayers = { lat: [], lng: [] };
-let gridConfig = { lat: { interval: 10, active: false }, lng: { interval: 10, active: false } };
-let selectedGridBtn = { lat: null, lng: null };
+let gridConfig = { lat: { interval: 15, active: false, lastInterval: 15, lastIsCustom: false }, lng: { interval: 15, active: false, lastInterval: 15, lastIsCustom: false } };
 
 // 마커 색상 팔레트
 const MARKER_COLORS = [
@@ -1603,12 +1602,15 @@ function setGrid(axis, val, btn) {
 
   if (val === 'custom') {
     customRow.style.display = 'flex';
+    gridConfig[axis].lastIsCustom = true;
   } else {
     customRow.style.display = 'none';
     gridConfig[axis].interval = val;
+    gridConfig[axis].lastInterval = val;
+    gridConfig[axis].lastIsCustom = false;
     toggle.checked = true;
     gridConfig[axis].active = true;
-    updateGrid();
+    drawGrid();
   }
 }
 
@@ -1621,10 +1623,52 @@ function applyCustomGrid(axis) {
     return;
   }
   gridConfig[axis].interval = val;
+  gridConfig[axis].lastInterval = val;
+  gridConfig[axis].lastIsCustom = true;
   const toggle = document.getElementById(axis === 'lat' ? 'latGridToggle' : 'lngGridToggle');
   toggle.checked = true;
   gridConfig[axis].active = true;
-  updateGrid();
+  drawGrid();
+}
+
+function syncGridButtons(axis) {
+  const container = document.getElementById(axis === 'lat' ? 'latGridOptions' : 'lngGridOptions');
+  const customRow = document.getElementById(axis === 'lat' ? 'latCustomRow' : 'lngCustomRow');
+  const interval = gridConfig[axis].lastInterval;
+  const isCustom = gridConfig[axis].lastIsCustom;
+
+  container.querySelectorAll('.grid-btn').forEach(b => b.classList.remove('active'));
+
+  if (isCustom) {
+    const customBtn = container.querySelector('.grid-btn[data-val="custom"]');
+    if (customBtn) customBtn.classList.add('active');
+    customRow.style.display = 'flex';
+  } else {
+    customRow.style.display = 'none';
+    const matchBtn = container.querySelector(`.grid-btn[data-val="${interval}"]`);
+    if (matchBtn) matchBtn.classList.add('active');
+  }
+}
+
+function clearGridButtons(axis) {
+  const container = document.getElementById(axis === 'lat' ? 'latGridOptions' : 'lngGridOptions');
+  const customRow = document.getElementById(axis === 'lat' ? 'latCustomRow' : 'lngCustomRow');
+  container.querySelectorAll('.grid-btn').forEach(b => b.classList.remove('active'));
+  customRow.style.display = 'none';
+}
+
+function onToggleGrid(axis) {
+  const toggle = document.getElementById(axis === 'lat' ? 'latGridToggle' : 'lngGridToggle');
+  const isOn = toggle.checked;
+  gridConfig[axis].active = isOn;
+
+  if (isOn) {
+    gridConfig[axis].interval = gridConfig[axis].lastInterval;
+    syncGridButtons(axis);
+  } else {
+    clearGridButtons(axis);
+  }
+  drawGrid();
 }
 
 function updateGrid() {
