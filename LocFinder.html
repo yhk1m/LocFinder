@@ -1,0 +1,1676 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LocFinder</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=Noto+Serif+KR:wght@400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #ffffff;
+    --sidebar-bg: #f8f9fa;
+    --border: #e2e5e9;
+    --text: #1a1d23;
+    --text-sub: #6b7280;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --accent-light: #eff6ff;
+    --danger: #ef4444;
+    --danger-hover: #dc2626;
+    --success: #10b981;
+    --card-bg: #ffffff;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
+    --radius: 8px;
+    --sidebar-width: 340px;
+    --font: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+    --mono: 'Noto Serif KR', 'Noto Sans KR', serif;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── Layout ── */
+  .app {
+    display: flex;
+    height: 100vh;
+  }
+
+  #map {
+    flex: 1;
+    height: 100%;
+    z-index: 1;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: var(--sidebar-width);
+    height: 100vh;
+    background: var(--sidebar-bg);
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    flex-shrink: 0;
+    z-index: 500;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar-header {
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .sidebar-header h1 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .sidebar-header h1 span {
+    font-size: 20px;
+  }
+
+  .sidebar-body {
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  /* ── Section Card ── */
+  .section {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    box-shadow: var(--shadow);
+  }
+
+  .section-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-sub);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+  }
+
+  /* ── Radio Group ── */
+  .radio-group {
+    display: flex;
+    gap: 4px;
+    background: #eef0f3;
+    border-radius: 6px;
+    padding: 3px;
+  }
+
+  .radio-group label {
+    flex: 1;
+    text-align: center;
+    padding: 7px 10px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--text-sub);
+    user-select: none;
+  }
+
+  .radio-group input { display: none; }
+
+  .radio-group input:checked + label {
+    background: var(--bg);
+    color: var(--text);
+    box-shadow: var(--shadow);
+    font-weight: 600;
+  }
+
+  /* ── Coordinate Display ── */
+  .coord-display {
+    background: var(--accent-light);
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+    padding: 12px;
+    margin-top: 10px;
+    text-align: center;
+    min-height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .coord-display.empty {
+    background: #f3f4f6;
+    border-color: var(--border);
+  }
+
+  .coord-text {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--accent);
+    word-break: break-all;
+  }
+
+  .coord-display.empty .coord-text {
+    font-family: var(--font);
+    font-size: 13px;
+    color: var(--text-sub);
+    font-weight: 400;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: var(--font);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .btn:hover { background: #f3f4f6; }
+  .btn:active { transform: scale(0.97); }
+
+  .btn-accent {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+  .btn-accent:hover { background: var(--accent-hover); }
+
+  .btn-danger {
+    background: #fff;
+    color: var(--danger);
+    border-color: #fecaca;
+  }
+  .btn-danger:hover { background: #fef2f2; }
+
+  .btn-sm {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+
+  .coord-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .coord-actions .btn { flex: 1; }
+
+  /* ── Grid Setting ── */
+  .grid-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .grid-btn {
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: var(--font);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .grid-btn:hover { background: #f3f4f6; }
+
+  .grid-btn.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+
+  .custom-input-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+    align-items: center;
+  }
+
+  .custom-input-row input {
+    width: 70px;
+    padding: 6px 8px;
+    font-size: 13px;
+    font-family: var(--mono);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    outline: none;
+    transition: border-color 0.15s;
+    text-align: center;
+  }
+
+  .custom-input-row input:focus {
+    border-color: var(--accent);
+  }
+
+  .custom-input-row span {
+    font-size: 12px;
+    color: var(--text-sub);
+  }
+
+  .round-select {
+    width: 100%;
+    padding: 7px 10px;
+    font-size: 13px;
+    font-family: var(--font);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .round-select:focus { border-color: var(--accent); }
+
+  /* ── Coordinate List ── */
+  .coord-list {
+    max-height: 220px;
+    overflow-y: auto;
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .coord-list::-webkit-scrollbar { width: 4px; }
+  .coord-list::-webkit-scrollbar-track { background: transparent; }
+  .coord-list::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+
+  .coord-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: #f9fafb;
+    border: 1px solid #eef0f3;
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+    transition: background 0.1s;
+  }
+
+  .coord-item:hover { background: #f3f4f6; }
+
+  .coord-item .num {
+    background: var(--accent);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    min-width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .coord-item .text { flex: 1; word-break: break-all; }
+
+  .coord-item .del-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    color: #d1d5db;
+    padding: 2px;
+    transition: color 0.15s;
+    flex-shrink: 0;
+  }
+
+  .coord-item .del-btn:hover { color: var(--danger); }
+
+  .list-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .list-actions .btn { flex: 1; font-size: 12px; }
+
+  .empty-list {
+    text-align: center;
+    padding: 20px 10px;
+    color: var(--text-sub);
+    font-size: 13px;
+  }
+
+  /* ── Grid Checkbox Toggle ── */
+  .grid-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+
+  .toggle-switch {
+    position: relative;
+    width: 38px;
+    height: 22px;
+    flex-shrink: 0;
+  }
+
+  .toggle-switch input { display: none; }
+
+  .toggle-slider {
+    position: absolute;
+    inset: 0;
+    background: #d1d5db;
+    border-radius: 11px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .toggle-slider::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    background: #fff;
+    border-radius: 50%;
+    top: 3px;
+    left: 3px;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+  }
+
+  .toggle-switch input:checked + .toggle-slider {
+    background: var(--accent);
+  }
+
+  .toggle-switch input:checked + .toggle-slider::after {
+    transform: translateX(16px);
+  }
+
+  .toggle-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  /* ── Hamburger ── */
+  .hamburger {
+    display: none;
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 1000;
+    width: 44px;
+    height: 44px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow-md);
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 4px;
+    transition: all 0.2s;
+  }
+
+  .hamburger span {
+    display: block;
+    width: 20px;
+    height: 2px;
+    background: var(--text);
+    border-radius: 1px;
+    transition: all 0.3s;
+  }
+
+  .hamburger.active span:nth-child(1) { transform: rotate(45deg) translate(4px, 4px); }
+  .hamburger.active span:nth-child(2) { opacity: 0; }
+  .hamburger.active span:nth-child(3) { transform: rotate(-45deg) translate(4px, -4px); }
+
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.3);
+    z-index: 400;
+  }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: #1f2937;
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    z-index: 2000;
+    opacity: 0;
+    transition: all 0.3s ease;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* ── Leaflet Label Override ── */
+  .coord-label {
+    background: rgba(255,255,255,0.95) !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 6px !important;
+    padding: 4px 8px !important;
+    font-family: var(--mono) !important;
+    font-size: 12px !important;
+    color: var(--text) !important;
+    box-shadow: var(--shadow) !important;
+    white-space: nowrap !important;
+  }
+
+  .coord-label::before { display: none !important; }
+
+  .grid-label-lat, .grid-label-lng {
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    font-family: var(--mono) !important;
+    font-weight: 600 !important;
+    color: rgba(37, 99, 235, 0.8) !important;
+    white-space: nowrap !important;
+    pointer-events: none !important;
+  }
+
+  .grid-label-lat::before, .grid-label-lng::before { display: none !important; }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .hamburger { display: flex; }
+
+    .sidebar {
+      position: fixed;
+      top: 0;
+      right: -100%;
+      width: min(340px, 85vw);
+      transition: right 0.3s ease;
+      box-shadow: -4px 0 20px rgba(0,0,0,0.1);
+    }
+
+    .sidebar.open { right: 0; }
+    .sidebar-overlay.show { display: block; }
+  }
+
+  /* ── Footer ── */
+  .sidebar-footer {
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    font-size: 11px;
+    color: #c0c4cc;
+    background: var(--sidebar-bg);
+  }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-overlay.show {
+    display: flex;
+  }
+
+  .modal {
+    background: var(--bg);
+    border-radius: 14px;
+    width: min(400px, 90vw);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    overflow: hidden;
+    animation: modalIn 0.2s ease;
+  }
+
+  @keyframes modalIn {
+    from { opacity: 0; transform: scale(0.95) translateY(10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .modal-header h2 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .modal-close {
+    background: none;
+    border: none;
+    font-size: 18px;
+    color: var(--text-sub);
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+
+  .modal-close:hover {
+    background: #f3f4f6;
+    color: var(--text);
+  }
+
+  .modal-body {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .modal-section {}
+
+  .modal-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+
+  .modal-footer {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--sidebar-bg);
+  }
+
+  .modal-footer .btn {
+    min-width: 80px;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div id="map"></div>
+
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h1><span>📍</span> LocFinder</h1>
+    </div>
+    <div class="sidebar-body">
+
+      <!-- 좌표 표시 방식 -->
+      <div class="section">
+        <div class="section-title">좌표 표시 방식</div>
+        <div class="radio-group">
+          <input type="radio" name="coordFormat" id="fmtDecimal" value="decimal" checked>
+          <label for="fmtDecimal">10진법</label>
+          <input type="radio" name="coordFormat" id="fmtDMS" value="dms">
+          <label for="fmtDMS">60진법</label>
+        </div>
+        <div style="margin-top:10px;">
+          <div class="section-title" style="margin-bottom:6px;">반올림 설정</div>
+          <div id="roundDecimalSection">
+            <select id="roundDecimal" class="round-select" onchange="onRoundingChange()">
+              <option value="0">자연수 (1°)</option>
+              <option value="1">소수점 1자리 (0.1°)</option>
+              <option value="2">소수점 2자리 (0.01°)</option>
+              <option value="3">소수점 3자리 (0.001°)</option>
+              <option value="4">소수점 4자리 (0.0001°)</option>
+              <option value="5">소수점 5자리 (0.00001°)</option>
+              <option value="-1" selected>반올림 없음</option>
+            </select>
+          </div>
+          <div id="roundDMSSection" style="display:none;">
+            <select id="roundDMS" class="round-select" onchange="onRoundingChange()">
+              <option value="0">초 자연수 (1")</option>
+              <option value="1" selected>초 소수점 1자리 (0.1")</option>
+              <option value="2">초 소수점 2자리 (0.01")</option>
+              <option value="-1">반올림 없음</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- 현재 좌표 -->
+      <div class="section">
+        <div class="section-title">현재 좌표</div>
+        <div class="coord-display empty" id="coordDisplay">
+          <span class="coord-text">지도를 클릭하세요</span>
+        </div>
+        <div class="coord-actions">
+          <button class="btn btn-sm" id="copyBtn" disabled onclick="copyCoord()">📋 복사</button>
+        </div>
+      </div>
+
+      <!-- 선택 모드 -->
+      <div class="section">
+        <div class="section-title">선택 모드</div>
+        <div class="radio-group">
+          <input type="radio" name="selectMode" id="modeSingle" value="single" checked>
+          <label for="modeSingle">단일선택</label>
+          <input type="radio" name="selectMode" id="modeMulti" value="multi">
+          <label for="modeMulti">복수선택</label>
+        </div>
+
+        <div id="multiSection" style="display:none; margin-top: 12px;">
+          <div class="section-title" style="margin-bottom:4px;">선택 좌표 목록</div>
+          <div class="coord-list" id="coordList">
+            <div class="empty-list">선택된 좌표가 없습니다</div>
+          </div>
+          <div class="list-actions">
+            <button class="btn btn-sm btn-danger" onclick="clearAll()">🗑 초기화</button>
+            <button class="btn btn-sm btn-accent" onclick="downloadCSV()">📥 CSV</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 위도 격자 -->
+      <div class="section">
+        <div class="grid-toggle">
+          <label class="toggle-switch">
+            <input type="checkbox" id="latGridToggle" onchange="updateGrid()">
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="toggle-label">위도 격자</span>
+        </div>
+        <div class="grid-options" id="latGridOptions">
+          <button class="grid-btn" data-val="10" onclick="setGrid('lat', 10, this)">10°</button>
+          <button class="grid-btn" data-val="15" onclick="setGrid('lat', 15, this)">15°</button>
+          <button class="grid-btn" data-val="30" onclick="setGrid('lat', 30, this)">30°</button>
+          <button class="grid-btn" data-val="custom" onclick="setGrid('lat', 'custom', this)">직접설정</button>
+        </div>
+        <div class="custom-input-row" id="latCustomRow" style="display:none;">
+          <input type="number" id="latCustomVal" min="1" max="90" placeholder="1~90" onchange="applyCustomGrid('lat')">
+          <span>도(°) 간격</span>
+        </div>
+      </div>
+
+      <!-- 경도 격자 -->
+      <div class="section">
+        <div class="grid-toggle">
+          <label class="toggle-switch">
+            <input type="checkbox" id="lngGridToggle" onchange="updateGrid()">
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="toggle-label">경도 격자</span>
+        </div>
+        <div class="grid-options" id="lngGridOptions">
+          <button class="grid-btn" data-val="10" onclick="setGrid('lng', 10, this)">10°</button>
+          <button class="grid-btn" data-val="15" onclick="setGrid('lng', 15, this)">15°</button>
+          <button class="grid-btn" data-val="30" onclick="setGrid('lng', 30, this)">30°</button>
+          <button class="grid-btn" data-val="custom" onclick="setGrid('lng', 'custom', this)">직접설정</button>
+        </div>
+        <div class="custom-input-row" id="lngCustomRow" style="display:none;">
+          <input type="number" id="lngCustomVal" min="1" max="180" placeholder="1~180" onchange="applyCustomGrid('lng')">
+          <span>도(°) 간격</span>
+        </div>
+      </div>
+
+      <!-- 지도 캡처 -->
+      <div class="section">
+        <div class="section-title">지도 캡처</div>
+        <button class="btn btn-accent" style="width:100%;" onclick="openPngModal()">📷 PNG 저장</button>
+        <div style="margin-top:6px; font-size:11px; color:var(--text-sub);">현재 지도 범위의 격자선과 포인트를 흑색 이미지로 저장합니다.</div>
+      </div>
+
+    </div>
+    <div class="sidebar-footer">Copyright 2026. 양정고등학교 김용현. All Rights Reserved.</div>
+  </div>
+</div>
+
+<!-- PNG Modal -->
+<div class="modal-overlay" id="pngModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>PNG 저장 설정</h2>
+      <button class="modal-close" onclick="closePngModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-section">
+        <div class="modal-label">위도 격자 숫자 위치</div>
+        <div class="radio-group">
+          <input type="radio" name="pngLatPos" id="pngLatLeft" value="left" checked>
+          <label for="pngLatLeft">좌측</label>
+          <input type="radio" name="pngLatPos" id="pngLatRight" value="right">
+          <label for="pngLatRight">우측</label>
+        </div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-label">경도 격자 숫자 위치</div>
+        <div class="radio-group">
+          <input type="radio" name="pngLngPos" id="pngLngTop" value="top" checked>
+          <label for="pngLngTop">위</label>
+          <input type="radio" name="pngLngPos" id="pngLngBottom" value="bottom">
+          <label for="pngLngBottom">아래</label>
+        </div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-label">포인트 좌표 라벨</div>
+        <div class="radio-group">
+          <input type="radio" name="pngLabel" id="pngLabelShow" value="show" checked>
+          <label for="pngLabelShow">표시</label>
+          <input type="radio" name="pngLabel" id="pngLabelHide" value="hide">
+          <label for="pngLabelHide">숨김</label>
+        </div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-label">포인트 기호</div>
+        <div class="radio-group" style="flex-wrap:wrap;">
+          <input type="radio" name="pngSymbol" id="pngSymNone" value="none" checked>
+          <label for="pngSymNone">없음</label>
+          <input type="radio" name="pngSymbol" id="pngSymGaNaDa" value="ganada">
+          <label for="pngSymGaNaDa">(가)(나)(다)</label>
+          <input type="radio" name="pngSymbol" id="pngSymABC" value="abc">
+          <label for="pngSymABC">A, B, C</label>
+          <input type="radio" name="pngSymbol" id="pngSymCircle" value="circle">
+          <label for="pngSymCircle">㉠㉡㉢</label>
+        </div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-label">세계 지도 윤곽선</div>
+        <div class="radio-group">
+          <input type="radio" name="pngBaseMap" id="pngMapShow" value="show">
+          <label for="pngMapShow">표시</label>
+          <input type="radio" name="pngBaseMap" id="pngMapHide" value="hide" checked>
+          <label for="pngMapHide">미표시</label>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closePngModal()">취소</button>
+      <button class="btn btn-accent" onclick="savePNG()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- Hamburger -->
+<button class="hamburger" id="hamburger" onclick="toggleSidebar()">
+  <span></span><span></span><span></span>
+</button>
+<div class="sidebar-overlay" id="overlay" onclick="toggleSidebar()"></div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════
+// State
+// ══════════════════════════════════════
+let map;
+let markers = [];
+let coordData = []; // { lat, lng }
+let currentCoord = null;
+let gridLayers = { lat: [], lng: [] };
+let gridConfig = { lat: { interval: 10, active: false }, lng: { interval: 10, active: false } };
+let selectedGridBtn = { lat: null, lng: null };
+
+// 마커 색상 팔레트
+const MARKER_COLORS = [
+  '#e53e3e', '#3182ce', '#38a169', '#dd6b20',
+  '#805ad5', '#d53f8c', '#319795', '#d69e2e',
+  '#2b6cb0', '#c05621', '#6b46c1', '#b83280'
+];
+
+// ══════════════════════════════════════
+// Initialize Map
+// ══════════════════════════════════════
+function initMap() {
+  map = L.map('map', {
+    center: [36.5, 127.5],
+    zoom: 7,
+    zoomControl: true
+  });
+
+  L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&hl=ko', {
+    attribution: '© Google',
+    maxZoom: 19
+  }).addTo(map);
+
+  map.on('click', onMapClick);
+}
+
+// ══════════════════════════════════════
+// Format Coordinates
+// ══════════════════════════════════════
+function getFormat() {
+  return document.querySelector('input[name="coordFormat"]:checked').value;
+}
+
+function getRounding() {
+  if (getFormat() === 'dms') {
+    return parseInt(document.getElementById('roundDMS').value);
+  }
+  return parseInt(document.getElementById('roundDecimal').value);
+}
+
+// 좌표 스냅 (반올림 설정에 따라 가장 가까운 격자점으로)
+function snapCoord(lat, lng) {
+  const fmt = getFormat();
+  const rnd = getRounding();
+
+  if (rnd === -1) return { lat, lng }; // 반올림 없음
+
+  if (fmt === 'decimal') {
+    const factor = Math.pow(10, rnd);
+    return {
+      lat: Math.round(lat * factor) / factor,
+      lng: Math.round(lng * factor) / factor
+    };
+  } else {
+    // DMS: 초의 소수점 기준으로 스냅
+    // rnd=0 → 1초 단위, rnd=1 → 0.1초 단위, rnd=2 → 0.01초 단위
+    const secFactor = Math.pow(10, rnd);
+    const step = 1 / (3600 * secFactor); // degree 단위 스텝
+
+    return {
+      lat: Math.round(lat / step) * step,
+      lng: Math.round(lng / step) * step
+    };
+  }
+}
+
+function toDMS(deg, isLat) {
+  const dir = isLat ? (deg >= 0 ? 'N' : 'S') : (deg >= 0 ? 'E' : 'W');
+  const abs = Math.abs(deg);
+  const d = Math.floor(abs);
+  const minFloat = (abs - d) * 60;
+  const m = Math.floor(minFloat);
+  const secRaw = (minFloat - m) * 60;
+
+  const rnd = getRounding();
+  let s;
+  if (rnd === -1) {
+    s = secRaw.toFixed(4);
+  } else {
+    s = secRaw.toFixed(rnd);
+  }
+
+  // 반올림으로 60이 되면 올림 처리
+  if (parseFloat(s) >= 60) {
+    s = (0).toFixed(rnd === -1 ? 4 : rnd);
+    const newM = m + 1;
+    if (newM >= 60) {
+      return `${d + 1}°00'${s.padStart(rnd === -1 ? 7 : (rnd === 0 ? 2 : rnd + 3), '0')}"${dir}`;
+    }
+    return `${d}°${String(newM).padStart(2, '0')}'${s.padStart(rnd === -1 ? 7 : (rnd === 0 ? 2 : rnd + 3), '0')}"${dir}`;
+  }
+
+  const padLen = rnd === -1 ? 7 : (rnd === 0 ? 2 : rnd + 3);
+  return `${d}°${String(m).padStart(2,'0')}'${s.padStart(padLen,'0')}"${dir}`;
+}
+
+function formatCoord(lat, lng) {
+  if (getFormat() === 'dms') {
+    return `${toDMS(lat, true)}, ${toDMS(lng, false)}`;
+  }
+  const rnd = getRounding();
+  const decimals = rnd === -1 ? 6 : rnd;
+  const latDir = lat >= 0 ? 'N' : 'S';
+  const lngDir = lng >= 0 ? 'E' : 'W';
+  return `${Math.abs(lat).toFixed(decimals)}°${latDir}, ${Math.abs(lng).toFixed(decimals)}°${lngDir}`;
+}
+
+function formatCoordShort(lat, lng) {
+  if (getFormat() === 'dms') {
+    return `${toDMS(lat, true)}\n${toDMS(lng, false)}`;
+  }
+  const rnd = getRounding();
+  const decimals = rnd === -1 ? 6 : rnd;
+  const latDir = lat >= 0 ? 'N' : 'S';
+  const lngDir = lng >= 0 ? 'E' : 'W';
+  return `${Math.abs(lat).toFixed(decimals)}°${latDir}\n${Math.abs(lng).toFixed(decimals)}°${lngDir}`;
+}
+
+// ══════════════════════════════════════
+// Map Click
+// ══════════════════════════════════════
+function onMapClick(e) {
+  const lat = e.latlng.lat;
+  const lng = e.latlng.lng;
+  currentCoord = { lat, lng };
+  const mode = document.querySelector('input[name="selectMode"]:checked').value;
+
+  if (mode === 'single') {
+    clearMarkers();
+    coordData = [{ lat, lng }];
+  } else {
+    coordData.push({ lat, lng });
+  }
+
+  addMarker(lat, lng, mode === 'multi' ? coordData.length : null);
+  updateCoordDisplay();
+  updateCoordList();
+  document.getElementById('copyBtn').disabled = false;
+}
+
+function addMarker(lat, lng, num) {
+  const snapped = snapCoord(lat, lng);
+  const colorIdx = num ? (num - 1) % MARKER_COLORS.length : 0;
+  const color = num ? MARKER_COLORS[colorIdx] : '#e53e3e';
+
+  const marker = L.circleMarker([snapped.lat, snapped.lng], {
+    radius: 8,
+    fillColor: color,
+    color: '#ffffff',
+    weight: 2,
+    opacity: 1,
+    fillOpacity: 1
+  }).addTo(map);
+
+  const labelText = formatCoordShort(lat, lng);
+  const tooltip = L.tooltip({
+    permanent: true,
+    direction: 'top',
+    offset: [0, -12],
+    className: 'coord-label'
+  }).setContent(
+    (num ? `<b style="color:${color}">#${num}</b> ` : '') +
+    labelText.replace('\n', ', ')
+  );
+
+  marker.bindTooltip(tooltip);
+  markers.push(marker);
+}
+
+function clearMarkers() {
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
+}
+
+// ══════════════════════════════════════
+// Update UI
+// ══════════════════════════════════════
+function updateCoordDisplay() {
+  const el = document.getElementById('coordDisplay');
+  if (!currentCoord) {
+    el.className = 'coord-display empty';
+    el.innerHTML = '<span class="coord-text">지도를 클릭하세요</span>';
+    return;
+  }
+  el.className = 'coord-display';
+  el.innerHTML = `<span class="coord-text">${formatCoord(currentCoord.lat, currentCoord.lng)}</span>`;
+}
+
+function updateCoordList() {
+  const mode = document.querySelector('input[name="selectMode"]:checked').value;
+  if (mode !== 'multi') return;
+
+  const list = document.getElementById('coordList');
+  if (coordData.length === 0) {
+    list.innerHTML = '<div class="empty-list">선택된 좌표가 없습니다</div>';
+    return;
+  }
+  list.innerHTML = coordData.map((c, i) => {
+    const color = MARKER_COLORS[i % MARKER_COLORS.length];
+    return `
+    <div class="coord-item">
+      <span class="num" style="background:${color}">${i + 1}</span>
+      <span class="text">${formatCoord(c.lat, c.lng)}</span>
+      <button class="del-btn" onclick="removeCoord(${i})" title="삭제">✕</button>
+    </div>
+  `}).join('');
+  list.scrollTop = list.scrollHeight;
+}
+
+function removeCoord(idx) {
+  coordData.splice(idx, 1);
+  clearMarkers();
+  coordData.forEach((c, i) => addMarker(c.lat, c.lng, i + 1));
+  if (coordData.length > 0) {
+    currentCoord = coordData[coordData.length - 1];
+  } else {
+    currentCoord = null;
+    document.getElementById('copyBtn').disabled = true;
+  }
+  updateCoordDisplay();
+  updateCoordList();
+}
+
+// ══════════════════════════════════════
+// Refresh all labels (format change)
+// ══════════════════════════════════════
+function refreshAllLabels() {
+  clearMarkers();
+  const mode = document.querySelector('input[name="selectMode"]:checked').value;
+  coordData.forEach((c, i) => {
+    addMarker(c.lat, c.lng, mode === 'multi' ? i + 1 : null);
+  });
+  updateCoordDisplay();
+  updateCoordList();
+  updateGrid();
+}
+
+// ══════════════════════════════════════
+// Select Mode Change
+// ══════════════════════════════════════
+document.querySelectorAll('input[name="selectMode"]').forEach(radio => {
+  radio.addEventListener('change', function() {
+    const multi = this.value === 'multi';
+    document.getElementById('multiSection').style.display = multi ? 'block' : 'none';
+    if (!multi) {
+      // Switch to single: keep only last
+      if (coordData.length > 0) {
+        const last = coordData[coordData.length - 1];
+        coordData = [last];
+        currentCoord = last;
+        clearMarkers();
+        addMarker(last.lat, last.lng, null);
+      }
+    } else {
+      // Switch to multi: relabel
+      clearMarkers();
+      coordData.forEach((c, i) => addMarker(c.lat, c.lng, i + 1));
+    }
+    updateCoordDisplay();
+    updateCoordList();
+  });
+});
+
+// ══════════════════════════════════════
+// Coordinate Format Change
+// ══════════════════════════════════════
+document.querySelectorAll('input[name="coordFormat"]').forEach(radio => {
+  radio.addEventListener('change', () => {
+    toggleRoundingSections();
+    refreshAllLabels();
+  });
+});
+
+function toggleRoundingSections() {
+  const fmt = getFormat();
+  document.getElementById('roundDecimalSection').style.display = fmt === 'decimal' ? 'block' : 'none';
+  document.getElementById('roundDMSSection').style.display = fmt === 'dms' ? 'block' : 'none';
+}
+
+function onRoundingChange() {
+  refreshAllLabels();
+}
+
+// ══════════════════════════════════════
+// Copy to clipboard
+// ══════════════════════════════════════
+function copyCoord() {
+  if (!currentCoord) return;
+  const text = formatCoord(currentCoord.lat, currentCoord.lng);
+  navigator.clipboard.writeText(text).then(() => showToast('좌표가 복사되었습니다'));
+}
+
+// ══════════════════════════════════════
+// PNG Modal
+// ══════════════════════════════════════
+function openPngModal() {
+  document.getElementById('pngModal').classList.add('show');
+}
+
+function closePngModal() {
+  document.getElementById('pngModal').classList.remove('show');
+}
+
+// 모달 바깥 클릭 시 닫기
+document.addEventListener('click', (e) => {
+  const modal = document.getElementById('pngModal');
+  if (e.target === modal) closePngModal();
+});
+
+// ══════════════════════════════════════
+// World Map GeoJSON Cache
+// ══════════════════════════════════════
+let cachedWorldGeo = null;
+
+async function loadWorldGeo() {
+  if (cachedWorldGeo) return cachedWorldGeo;
+  try {
+    const resp = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json');
+    const topo = await resp.json();
+    cachedWorldGeo = topojson.feature(topo, topo.objects.countries);
+    return cachedWorldGeo;
+  } catch (e) {
+    showToast('세계지도 데이터를 불러오지 못했습니다');
+    return null;
+  }
+}
+
+// ══════════════════════════════════════
+// Save Map as PNG (Canvas API 직접 렌더링)
+// ══════════════════════════════════════
+async function savePNG() {
+  const latLabelPos = document.querySelector('input[name="pngLatPos"]:checked').value;
+  const lngLabelPos = document.querySelector('input[name="pngLngPos"]:checked').value;
+  const showPointLabel = document.querySelector('input[name="pngLabel"]:checked').value === 'show';
+  const showBaseMap = document.querySelector('input[name="pngBaseMap"]:checked').value === 'show';
+
+  closePngModal();
+
+  let worldGeo = null;
+  if (showBaseMap) {
+    showToast('세계지도 데이터 로딩 중...');
+    worldGeo = await loadWorldGeo();
+  }
+
+  const bounds = map.getBounds();
+  const latMin = bounds.getSouth();
+  const latMax = bounds.getNorth();
+  const lngMin = bounds.getWest();
+  const lngMax = bounds.getEast();
+
+  const SCALE = 3;
+  const W = 1600, H = 1000, PAD = 50;
+  const canvas = document.createElement('canvas');
+  canvas.width = W * SCALE; canvas.height = H * SCALE;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(SCALE, SCALE);
+
+  // 배경
+  ctx.fillStyle = showBaseMap ? '#e6e6e6' : '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+
+  // 좌표 → 캔버스 변환 (단순 선형)
+  const toX = lng => PAD + ((lng - lngMin) / (lngMax - lngMin)) * (W - PAD * 2);
+  const toY = lat => PAD + ((latMax - lat) / (latMax - latMin)) * (H - PAD * 2);
+
+  // ── 세계지도 윤곽선 ──
+  if (worldGeo) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(PAD, PAD, W - PAD * 2, H - PAD * 2);
+    ctx.clip();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#999999';
+    ctx.lineWidth = 1;
+
+    function drawGeoRing(ring) {
+      if (ring.length < 2) return;
+
+      // 경도 unwrap: 이전 점 대비 180° 이상 점프하면 ±360 보정
+      // → 러시아, 남극, 피지 등 모든 횡단 폴리곤을 연속으로 만듦
+      const unwrapped = [ring[0][0]];
+      for (let k = 1; k < ring.length; k++) {
+        let lng = ring[k][0];
+        const prev = unwrapped[k - 1];
+        while (lng - prev > 180) lng -= 360;
+        while (lng - prev < -180) lng += 360;
+        unwrapped.push(lng);
+      }
+
+      ctx.beginPath();
+      for (let k = 0; k < ring.length; k++) {
+        const x = toX(unwrapped[k]);
+        const y = toY(ring[k][1]);
+        if (k === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    function drawGeometry(geom) {
+      if (!geom) return;
+      if (geom.type === 'Polygon') geom.coordinates.forEach(drawGeoRing);
+      else if (geom.type === 'MultiPolygon') geom.coordinates.forEach(p => p.forEach(drawGeoRing));
+      else if (geom.type === 'GeometryCollection') geom.geometries.forEach(drawGeometry);
+    }
+
+    if (worldGeo.features) worldGeo.features.forEach(f => drawGeometry(f.geometry));
+    else if (worldGeo.geometry) drawGeometry(worldGeo.geometry);
+    else drawGeometry(worldGeo);
+
+    ctx.restore();
+  }
+
+  // 바깥 테두리
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(PAD, PAD, W - PAD * 2, H - PAD * 2);
+
+  // 반응형 폰트 크기
+  function calcGridFontSize(interval, range) {
+    const n = Math.floor(range / interval);
+    if (n <= 4) return 18; if (n <= 8) return 16;
+    if (n <= 14) return 14; if (n <= 20) return 12; return 10;
+  }
+
+  // 위경도 격자 폰트 크기 통일 (둘 중 큰 값)
+  const latFontSize = gridConfig.lat.active ? calcGridFontSize(gridConfig.lat.interval, latMax - latMin) : 14;
+  const lngFontSize = gridConfig.lng.active ? calcGridFontSize(gridConfig.lng.interval, lngMax - lngMin) : 14;
+  const gridFontSize = Math.max(latFontSize, lngFontSize);
+
+  // 위도 격자선
+  if (gridConfig.lat.active) {
+    const interval = gridConfig.lat.interval;
+    const startLat = Math.ceil(latMin / interval) * interval;
+
+    for (let lat = startLat; lat <= latMax; lat += interval) {
+      const y = toY(lat);
+      if (y < PAD || y > H - PAD) continue;
+      ctx.strokeStyle = '#000000';
+      if (lat === 0) { ctx.setLineDash([]); ctx.lineWidth = 2; }
+      else { ctx.setLineDash([6, 4]); ctx.lineWidth = 1; }
+      ctx.beginPath(); ctx.moveTo(PAD, y); ctx.lineTo(W - PAD, y); ctx.stroke();
+
+      const label = lat === 0 ? '0°' : `${Math.abs(lat)}°${lat > 0 ? 'N' : 'S'}`;
+      ctx.setLineDash([]); ctx.fillStyle = '#000000';
+      ctx.font = `bold ${gridFontSize}px "Noto Serif KR", serif`;
+      ctx.textBaseline = 'middle';
+      if (latLabelPos === 'left') { ctx.textAlign = 'right'; ctx.fillText(label, PAD - 6, y); }
+      else { ctx.textAlign = 'left'; ctx.fillText(label, W - PAD + 6, y); }
+    }
+  }
+
+  // 경도 격자선
+  if (gridConfig.lng.active) {
+    const interval = gridConfig.lng.interval;
+    const startLng = Math.ceil(lngMin / interval) * interval;
+
+    for (let lng = startLng; lng <= lngMax; lng += interval) {
+      const x = toX(lng);
+      if (x < PAD || x > W - PAD) continue;
+      ctx.strokeStyle = '#000000';
+      if (lng === 0) { ctx.setLineDash([]); ctx.lineWidth = 2; }
+      else { ctx.setLineDash([6, 4]); ctx.lineWidth = 1; }
+      ctx.beginPath(); ctx.moveTo(x, PAD); ctx.lineTo(x, H - PAD); ctx.stroke();
+
+      const label = lng === 0 ? '0°' : `${Math.abs(lng)}°${lng > 0 ? 'E' : 'W'}`;
+      ctx.setLineDash([]); ctx.fillStyle = '#000000';
+      ctx.font = `bold ${gridFontSize}px "Noto Serif KR", serif`;
+      ctx.textAlign = 'center';
+      if (lngLabelPos === 'top') { ctx.textBaseline = 'bottom'; ctx.fillText(label, x, PAD - 6); }
+      else { ctx.textBaseline = 'top'; ctx.fillText(label, x, H - PAD + 6); }
+    }
+  }
+
+  // 기호 생성 함수
+  const symbolType = document.querySelector('input[name="pngSymbol"]:checked').value;
+  const GANADA = ['가','나','다','라','마','바','사','아','자','차','카','타','파','하'];
+  const CIRCLE_KR = ['㉠','㉡','㉢','㉣','㉤','㉥','㉦','㉧','㉨','㉩','㉪','㉫','㉬','㉭'];
+
+  function getSymbol(idx) {
+    if (symbolType === 'ganada') return `(${GANADA[idx % GANADA.length]})`;
+    if (symbolType === 'abc') return String.fromCharCode(65 + (idx % 26));
+    if (symbolType === 'circle') return CIRCLE_KR[idx % CIRCLE_KR.length];
+    return null;
+  }
+
+  // 포인트 + 통합 라벨 (기호+좌표 결합, 흰색 외곽선 텍스트)
+  ctx.setLineDash([]);
+  const mode = document.querySelector('input[name="selectMode"]:checked').value;
+  const placedRects = [];
+  const pointsInfo = [];
+  const labelFont = 'bold 13px "Noto Serif KR", serif';
+  ctx.font = labelFont;
+
+  coordData.forEach((c, i) => {
+    const snapped = snapCoord(c.lat, c.lng);
+    const px = toX(snapped.lng), py = toY(snapped.lat);
+    if (px < PAD || px > W - PAD || py < PAD || py > H - PAD) return;
+
+    // 포인트 영역을 충돌 목록에 등록 (라벨이 포인트 위에 오지 않도록)
+    const ptR = 12;
+    placedRects.push({ x: px - ptR, y: py - ptR, w: ptR * 2, h: ptR * 2 });
+
+    // 통합 라벨 텍스트 생성 (기호 + 좌표)
+    const sym = getSymbol(i);
+    const coordLabel = showPointLabel ? formatCoord(c.lat, c.lng) : '';
+    let displayLabel = '';
+    if (sym && coordLabel) {
+      displayLabel = `${sym} | ${coordLabel}`;
+    } else if (sym) {
+      displayLabel = sym;
+    } else if (coordLabel) {
+      displayLabel = mode === 'multi' ? `#${i + 1} ${coordLabel}` : coordLabel;
+    }
+
+    if (!displayLabel) {
+      pointsInfo.push({ px, py, displayLabel: null });
+      return;
+    }
+
+    ctx.font = labelFont;
+    const tw = ctx.measureText(displayLabel).width + 6;
+    const th = 20;
+
+    // 라벨 위치 후보 (8방향 × 여러 거리, 포인트와 겹치지 않도록)
+    const candidates = [];
+    [24, 40, 58, 78].forEach(d => {
+      candidates.push({ lx: px + d, ly: py - th / 2 });
+      candidates.push({ lx: px - tw - d, ly: py - th / 2 });
+      candidates.push({ lx: px - tw / 2, ly: py - d - th });
+      candidates.push({ lx: px - tw / 2, ly: py + d });
+      candidates.push({ lx: px + d * 0.7, ly: py - d * 0.7 - th });
+      candidates.push({ lx: px + d * 0.7, ly: py + d * 0.7 });
+      candidates.push({ lx: px - tw - d * 0.7, ly: py - d * 0.7 - th });
+      candidates.push({ lx: px - tw - d * 0.7, ly: py + d * 0.7 });
+    });
+
+    const overlaps = (rx, ry, rw, rh) => placedRects.some(q =>
+      rx < q.x + q.w && rx + rw > q.x && ry < q.y + q.h && ry + rh > q.y
+    );
+    let chosen = candidates[0];
+    for (const cand of candidates) {
+      if (!overlaps(cand.lx, cand.ly, tw, th)) { chosen = cand; break; }
+    }
+    placedRects.push({ x: chosen.lx, y: chosen.ly, w: tw, h: th });
+
+    pointsInfo.push({ px, py, displayLabel, lx: chosen.lx, ly: chosen.ly, tw, th });
+  });
+
+  // 1. 포인트 렌더링
+  pointsInfo.forEach(p => {
+    ctx.fillStyle = '#000000'; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(p.px, p.py, 7, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  });
+
+  // 2. 유도선 + 통합 라벨 렌더링 (컨테이너 없이, 흰색 외곽선 텍스트)
+  pointsInfo.forEach(p => {
+    if (!p.displayLabel) return;
+    const labelCx = p.lx + p.tw / 2, labelCy = p.ly + p.th / 2;
+
+    // 유도선 (점선)
+    ctx.strokeStyle = '#555555'; ctx.lineWidth = 0.8;
+    ctx.setLineDash([3, 2]);
+    ctx.beginPath(); ctx.moveTo(p.px, p.py); ctx.lineTo(labelCx, labelCy); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // 텍스트 (흰색 외곽선 + 검정 채우기)
+    ctx.font = labelFont;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.lineJoin = 'round'; ctx.miterLimit = 2;
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4;
+    ctx.strokeText(p.displayLabel, p.lx + 3, p.ly + 3);
+    ctx.fillStyle = '#000000';
+    ctx.fillText(p.displayLabel, p.lx + 3, p.ly + 3);
+  });
+
+  const link = document.createElement('a');
+  link.download = `grid_${new Date().toISOString().slice(0,10)}_${Date.now()}.png`;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+  showToast('PNG 파일이 저장되었습니다');
+}
+
+// ══════════════════════════════════════
+// Clear all (multi mode)
+// ══════════════════════════════════════
+function clearAll() {
+  coordData = [];
+  currentCoord = null;
+  clearMarkers();
+  updateCoordDisplay();
+  updateCoordList();
+  document.getElementById('copyBtn').disabled = true;
+  showToast('모든 좌표가 초기화되었습니다');
+}
+
+// ══════════════════════════════════════
+// CSV Download
+// ══════════════════════════════════════
+function downloadCSV() {
+  if (coordData.length === 0) {
+    showToast('다운로드할 좌표가 없습니다');
+    return;
+  }
+  const fmt = getFormat();
+  let csv = '\uFEFF'; // BOM for Excel
+  if (fmt === 'dms') {
+    csv += '번호,위도(DMS),경도(DMS)\n';
+    coordData.forEach((c, i) => {
+      csv += `${i + 1},"${toDMS(c.lat, true)}","${toDMS(c.lng, false)}"\n`;
+    });
+  } else {
+    const rnd = getRounding();
+    const decimals = rnd === -1 ? 6 : rnd;
+    csv += '번호,위도,경도\n';
+    coordData.forEach((c, i) => {
+      csv += `${i + 1},${c.lat.toFixed(decimals)},${c.lng.toFixed(decimals)}\n`;
+    });
+  }
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `coordinates_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('CSV 파일이 다운로드되었습니다');
+}
+
+// ══════════════════════════════════════
+// Grid System
+// ══════════════════════════════════════
+function setGrid(axis, val, btn) {
+  const container = document.getElementById(axis === 'lat' ? 'latGridOptions' : 'lngGridOptions');
+  container.querySelectorAll('.grid-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const customRow = document.getElementById(axis === 'lat' ? 'latCustomRow' : 'lngCustomRow');
+  const toggle = document.getElementById(axis === 'lat' ? 'latGridToggle' : 'lngGridToggle');
+
+  if (val === 'custom') {
+    customRow.style.display = 'flex';
+  } else {
+    customRow.style.display = 'none';
+    gridConfig[axis].interval = val;
+    toggle.checked = true;
+    gridConfig[axis].active = true;
+    updateGrid();
+  }
+}
+
+function applyCustomGrid(axis) {
+  const input = document.getElementById(axis === 'lat' ? 'latCustomVal' : 'lngCustomVal');
+  const val = parseFloat(input.value);
+  const max = axis === 'lat' ? 90 : 180;
+  if (!val || val <= 0 || val > max) {
+    showToast(`1~${max} 사이의 값을 입력하세요`);
+    return;
+  }
+  gridConfig[axis].interval = val;
+  const toggle = document.getElementById(axis === 'lat' ? 'latGridToggle' : 'lngGridToggle');
+  toggle.checked = true;
+  gridConfig[axis].active = true;
+  updateGrid();
+}
+
+function updateGrid() {
+  gridConfig.lat.active = document.getElementById('latGridToggle').checked;
+  gridConfig.lng.active = document.getElementById('lngGridToggle').checked;
+  drawGrid();
+}
+
+function drawGrid() {
+  // Clear
+  gridLayers.lat.forEach(l => map.removeLayer(l));
+  gridLayers.lng.forEach(l => map.removeLayer(l));
+  gridLayers.lat = [];
+  gridLayers.lng = [];
+
+  const gridStyle = { color: 'rgba(37, 99, 235, 0.25)', weight: 1, dashArray: '6 4' };
+
+  // 반응형 폰트 크기 계산 (위경도 통일)
+  function calcFontSize(interval, axis) {
+    const bounds = map.getBounds();
+    let range;
+    if (axis === 'lat') {
+      range = bounds.getNorth() - bounds.getSouth();
+    } else {
+      range = bounds.getEast() - bounds.getWest();
+    }
+    const lineCount = Math.floor(range / interval);
+    if (lineCount <= 4) return 16;
+    if (lineCount <= 8) return 14;
+    if (lineCount <= 14) return 12;
+    if (lineCount <= 20) return 11;
+    return 10;
+  }
+
+  const latFS = gridConfig.lat.active ? calcFontSize(gridConfig.lat.interval, 'lat') : 12;
+  const lngFS = gridConfig.lng.active ? calcFontSize(gridConfig.lng.interval, 'lng') : 12;
+  const gridFS = Math.max(latFS, lngFS);
+
+  // Latitude lines
+  if (gridConfig.lat.active) {
+    const interval = gridConfig.lat.interval;
+    for (let lat = -90; lat <= 90; lat += interval) {
+      if (lat === 0) {
+        const line = L.polyline([[-0.001, -180], [0.001, 180]], {
+          ...gridStyle, color: 'rgba(37, 99, 235, 0.5)', weight: 2, dashArray: null
+        }).addTo(map);
+        gridLayers.lat.push(line);
+      } else {
+        const line = L.polyline([[lat, -180], [lat, 180]], gridStyle).addTo(map);
+        gridLayers.lat.push(line);
+      }
+
+      // Label
+      const labelText = lat === 0 ? '0°' : `${Math.abs(lat)}°${lat > 0 ? 'N' : 'S'}`;
+      const label = L.tooltip({
+        permanent: true,
+        direction: 'right',
+        offset: [5, 0],
+        className: 'grid-label-lat'
+      }).setLatLng([lat, map.getBounds().getWest() + 2]);
+      label.setContent(`<span style="font-size:${gridFS}px">${labelText}</span>`);
+      const lm = L.marker([lat, map.getBounds().getWest()], { opacity: 0 }).addTo(map).bindTooltip(label);
+      gridLayers.lat.push(lm);
+    }
+  }
+
+  // Longitude lines
+  if (gridConfig.lng.active) {
+    const interval = gridConfig.lng.interval;
+    for (let lng = -180; lng <= 180; lng += interval) {
+      if (lng === 0) {
+        const line = L.polyline([[-90, 0], [90, 0]], {
+          ...gridStyle, color: 'rgba(37, 99, 235, 0.5)', weight: 2, dashArray: null
+        }).addTo(map);
+        gridLayers.lng.push(line);
+      } else {
+        const line = L.polyline([[-90, lng], [90, lng]], gridStyle).addTo(map);
+        gridLayers.lng.push(line);
+      }
+
+      // Label
+      const labelText = lng === 0 ? '0°' : `${Math.abs(lng)}°${lng > 0 ? 'E' : 'W'}`;
+      const label = L.tooltip({
+        permanent: true,
+        direction: 'top',
+        offset: [0, -5],
+        className: 'grid-label-lng'
+      }).setLatLng([map.getBounds().getSouth() + 1, lng]);
+      label.setContent(`<span style="font-size:${gridFS}px">${labelText}</span>`);
+      const lm = L.marker([map.getBounds().getSouth(), lng], { opacity: 0 }).addTo(map).bindTooltip(label);
+      gridLayers.lng.push(lm);
+    }
+  }
+}
+
+// Re-position grid labels on map move
+function onMapMove() {
+  if (!gridConfig.lat.active && !gridConfig.lng.active) return;
+  drawGrid();
+}
+
+// ══════════════════════════════════════
+// Sidebar Toggle (Mobile)
+// ══════════════════════════════════════
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('overlay');
+  const hamburger = document.getElementById('hamburger');
+  sidebar.classList.toggle('open');
+  overlay.classList.toggle('show');
+  hamburger.classList.toggle('active');
+}
+
+// ══════════════════════════════════════
+// Toast
+// ══════════════════════════════════════
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// ══════════════════════════════════════
+// Init
+// ══════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  initMap();
+
+  // Debounce map move for grid label repositioning
+  let moveTimeout;
+  map.on('moveend', () => {
+    clearTimeout(moveTimeout);
+    moveTimeout = setTimeout(onMapMove, 150);
+  });
+
+  // Enter key for custom grid inputs
+  document.getElementById('latCustomVal').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') applyCustomGrid('lat');
+  });
+  document.getElementById('lngCustomVal').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') applyCustomGrid('lng');
+  });
+});
+</script>
+</body>
+</html>
