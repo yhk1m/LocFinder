@@ -810,7 +810,7 @@
         </div>
         <div class="custom-input-row" style="margin-top:8px;">
           <span style="font-size:12px;color:var(--text-sub);white-space:nowrap;">라벨 크기</span>
-          <input type="range" id="pngLabelSize" min="8" max="24" value="13" style="flex:1;">
+          <input type="range" id="pngLabelSize" min="8" max="40" value="13" style="flex:1;">
           <span id="pngLabelSizeVal" style="font-size:12px;color:var(--text-sub);min-width:28px;text-align:center;">13</span>
         </div>
       </div>
@@ -828,7 +828,7 @@
         </div>
         <div class="custom-input-row" style="margin-top:8px;">
           <span style="font-size:12px;color:var(--text-sub);white-space:nowrap;">기호 크기</span>
-          <input type="range" id="pngSymbolSize" min="10" max="28" value="14" style="flex:1;">
+          <input type="range" id="pngSymbolSize" min="10" max="40" value="14" style="flex:1;">
           <span id="pngSymbolSizeVal" style="font-size:12px;color:var(--text-sub);min-width:28px;text-align:center;">14</span>
         </div>
       </div>
@@ -844,7 +844,25 @@
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closePngModal()">취소</button>
+      <button class="btn" onclick="previewPNG()">미리보기</button>
       <button class="btn btn-accent" onclick="savePNG()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- Preview Modal -->
+<div class="modal-overlay" id="previewModal">
+  <div class="modal" style="width:min(90vw,900px);">
+    <div class="modal-header">
+      <h2>미리보기</h2>
+      <button class="modal-close" onclick="closePreviewModal()">✕</button>
+    </div>
+    <div class="modal-body" style="padding:12px;max-height:70vh;overflow:auto;">
+      <canvas id="previewCanvas" style="width:100%;border:1px solid var(--border);border-radius:6px;"></canvas>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closePreviewModal()">설정으로 돌아가기</button>
+      <button class="btn btn-accent" onclick="downloadPreview()">저장</button>
     </div>
   </div>
 </div>
@@ -1207,13 +1225,13 @@ async function loadWorldGeo() {
 // ══════════════════════════════════════
 // Save Map as PNG (Canvas API 직접 렌더링)
 // ══════════════════════════════════════
-async function savePNG() {
+let lastRenderedCanvas = null;
+
+async function renderPNG() {
   const latLabelPos = document.querySelector('input[name="pngLatPos"]:checked').value;
   const lngLabelPos = document.querySelector('input[name="pngLngPos"]:checked').value;
   const showPointLabel = document.querySelector('input[name="pngLabel"]:checked').value === 'show';
   const showBaseMap = document.querySelector('input[name="pngBaseMap"]:checked').value === 'show';
-
-  closePngModal();
 
   let worldGeo = null;
   if (showBaseMap) {
@@ -1477,12 +1495,53 @@ async function savePNG() {
     });
   });
 
+  return canvas;
+}
+
+function downloadCanvas(canvas) {
   const link = document.createElement('a');
   link.download = `grid_${new Date().toISOString().slice(0,10)}_${Date.now()}.png`;
   link.href = canvas.toDataURL('image/png');
   link.click();
   showToast('PNG 파일이 저장되었습니다');
 }
+
+async function savePNG() {
+  closePngModal();
+  const canvas = await renderPNG();
+  downloadCanvas(canvas);
+}
+
+async function previewPNG() {
+  closePngModal();
+  const canvas = await renderPNG();
+  lastRenderedCanvas = canvas;
+
+  const previewCanvas = document.getElementById('previewCanvas');
+  previewCanvas.width = canvas.width;
+  previewCanvas.height = canvas.height;
+  previewCanvas.getContext('2d').drawImage(canvas, 0, 0);
+
+  document.getElementById('previewModal').classList.add('show');
+}
+
+function closePreviewModal() {
+  document.getElementById('previewModal').classList.remove('show');
+  document.getElementById('pngModal').classList.add('show');
+}
+
+function downloadPreview() {
+  if (lastRenderedCanvas) {
+    downloadCanvas(lastRenderedCanvas);
+    document.getElementById('previewModal').classList.remove('show');
+  }
+}
+
+// 미리보기 모달 바깥 클릭 시 닫기
+document.addEventListener('click', (e) => {
+  const modal = document.getElementById('previewModal');
+  if (e.target === modal) closePreviewModal();
+});
 
 // ══════════════════════════════════════
 // Clear all (multi mode)
