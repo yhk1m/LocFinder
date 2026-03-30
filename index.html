@@ -808,6 +808,11 @@
           <input type="radio" name="pngLabel" id="pngLabelHide" value="hide">
           <label for="pngLabelHide">숨김</label>
         </div>
+        <div class="custom-input-row" style="margin-top:8px;">
+          <span style="font-size:12px;color:var(--text-sub);white-space:nowrap;">라벨 크기</span>
+          <input type="range" id="pngLabelSize" min="8" max="24" value="13" style="flex:1;">
+          <span id="pngLabelSizeVal" style="font-size:12px;color:var(--text-sub);min-width:28px;text-align:center;">13</span>
+        </div>
       </div>
       <div class="modal-section">
         <div class="modal-label">포인트 기호</div>
@@ -820,6 +825,11 @@
           <label for="pngSymABC">A, B, C</label>
           <input type="radio" name="pngSymbol" id="pngSymCircle" value="circle">
           <label for="pngSymCircle">㉠㉡㉢</label>
+        </div>
+        <div class="custom-input-row" style="margin-top:8px;">
+          <span style="font-size:12px;color:var(--text-sub);white-space:nowrap;">기호 크기</span>
+          <input type="range" id="pngSymbolSize" min="10" max="28" value="14" style="flex:1;">
+          <span id="pngSymbolSizeVal" style="font-size:12px;color:var(--text-sub);min-width:28px;text-align:center;">14</span>
         </div>
       </div>
       <div class="modal-section">
@@ -1162,6 +1172,14 @@ function closePngModal() {
   document.getElementById('pngModal').classList.remove('show');
 }
 
+// 슬라이더 값 표시
+document.getElementById('pngLabelSize').addEventListener('input', function() {
+  document.getElementById('pngLabelSizeVal').textContent = this.value;
+});
+document.getElementById('pngSymbolSize').addEventListener('input', function() {
+  document.getElementById('pngSymbolSizeVal').textContent = this.value;
+});
+
 // 모달 바깥 클릭 시 닫기
 document.addEventListener('click', (e) => {
   const modal = document.getElementById('pngModal');
@@ -1349,12 +1367,12 @@ async function savePNG() {
   }
 
   // 포인트 + 통합 라벨 (기호+좌표 결합, 흰색 외곽선 텍스트)
+  const pngLabelSize = parseInt(document.getElementById('pngLabelSize').value);
+  const pngSymbolSize = parseInt(document.getElementById('pngSymbolSize').value);
   ctx.setLineDash([]);
   const mode = document.querySelector('input[name="selectMode"]:checked').value;
   const placedRects = [];
   const pointsInfo = [];
-  const labelFont = 'bold 13px "Noto Serif KR", serif';
-  ctx.font = labelFont;
 
   coordData.forEach((c, i) => {
     const snapped = snapCoord(c.lat, c.lng);
@@ -1378,15 +1396,23 @@ async function savePNG() {
     }
 
     if (!displayLabel) {
-      pointsInfo.push({ px, py, displayLabel: null });
+      pointsInfo.push({ px, py, parts: null });
       return;
     }
 
-    ctx.font = labelFont;
-    const tw = ctx.measureText(displayLabel).width + 6;
-    const th = 20;
+    // 기호/좌표 파트 분리 (크기가 다를 수 있으므로)
+    const parts = [];
+    if (sym) parts.push({ text: sym, font: `bold ${pngSymbolSize}px "Noto Serif KR", serif` });
+    if (sym && coordLabel) parts.push({ text: ' | ', font: `bold ${pngLabelSize}px "Noto Serif KR", serif` });
+    if (!sym && coordLabel && mode === 'multi') parts.push({ text: `#${i + 1} `, font: `bold ${pngLabelSize}px "Noto Serif KR", serif` });
+    if (coordLabel) parts.push({ text: coordLabel, font: `bold ${pngLabelSize}px "Noto Serif KR", serif` });
 
-    // 라벨 위치 후보 (8방향 × 여러 거리, 포인트와 겹치지 않도록)
+    // 전체 폭 계산
+    let tw = 6;
+    parts.forEach(p => { ctx.font = p.font; tw += ctx.measureText(p.text).width; });
+    const th = Math.max(pngLabelSize, pngSymbolSize) + 8;
+
+    // 라벨 위치 후보 (8방향 x 여러 거리, 포인트와 겹치지 않도록)
     const candidates = [];
     [24, 40, 58, 78].forEach(d => {
       candidates.push({ lx: px + d, ly: py - th / 2 });
@@ -1408,7 +1434,7 @@ async function savePNG() {
     }
     placedRects.push({ x: chosen.lx, y: chosen.ly, w: tw, h: th });
 
-    pointsInfo.push({ px, py, displayLabel, lx: chosen.lx, ly: chosen.ly, tw, th });
+    pointsInfo.push({ px, py, parts, lx: chosen.lx, ly: chosen.ly, tw, th });
   });
 
   // 1. 포인트 렌더링
@@ -1419,7 +1445,7 @@ async function savePNG() {
 
   // 2. 유도선 + 통합 라벨 렌더링 (컨테이너 없이, 흰색 외곽선 텍스트)
   pointsInfo.forEach(p => {
-    if (!p.displayLabel) return;
+    if (!p.parts) return;
     const labelCx = p.lx + p.tw / 2, labelCy = p.ly + p.th / 2;
 
     // 유도선 (점선)
@@ -1428,14 +1454,27 @@ async function savePNG() {
     ctx.beginPath(); ctx.moveTo(p.px, p.py); ctx.lineTo(labelCx, labelCy); ctx.stroke();
     ctx.setLineDash([]);
 
-    // 텍스트 (흰색 외곽선 + 검정 채우기)
-    ctx.font = labelFont;
-    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    // 텍스트 파트별 렌더링 (흰색 외곽선 + 검정 채우기)
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     ctx.lineJoin = 'round'; ctx.miterLimit = 2;
-    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4;
-    ctx.strokeText(p.displayLabel, p.lx + 3, p.ly + 3);
-    ctx.fillStyle = '#000000';
-    ctx.fillText(p.displayLabel, p.lx + 3, p.ly + 3);
+    let dx = p.lx + 3;
+    const dy = p.ly + p.th / 2;
+
+    // 흰색 외곽선 패스
+    p.parts.forEach(part => {
+      ctx.font = part.font;
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4;
+      ctx.strokeText(part.text, dx, dy);
+      dx += ctx.measureText(part.text).width;
+    });
+    // 검정 채우기 패스
+    dx = p.lx + 3;
+    p.parts.forEach(part => {
+      ctx.font = part.font;
+      ctx.fillStyle = '#000000';
+      ctx.fillText(part.text, dx, dy);
+      dx += ctx.measureText(part.text).width;
+    });
   });
 
   const link = document.createElement('a');
