@@ -1176,7 +1176,7 @@ let cachedWorldGeo = null;
 async function loadWorldGeo() {
   if (cachedWorldGeo) return cachedWorldGeo;
   try {
-    const resp = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json');
+    const resp = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json');
     const topo = await resp.json();
     cachedWorldGeo = topojson.feature(topo, topo.objects.countries);
     return cachedWorldGeo;
