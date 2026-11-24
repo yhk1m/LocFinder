@@ -549,6 +549,15 @@
     color: #c0c4cc;
     background: var(--sidebar-bg);
   }
+  .sidebar-footer [data-bgnl-family] {
+    margin-bottom: 8px;
+    color: var(--text-sub);
+  }
+  .sidebar .sidebar-footer .bgnl-fam .bgnl-fam__list {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+  }
 
   /* ── Modal ── */
   .modal-overlay {
@@ -770,7 +779,10 @@
       </div>
 
     </div>
-    <div class="sidebar-footer">Copyright 2026. 양정고등학교 김용현. All Rights Reserved.</div>
+    <div class="sidebar-footer">
+      <div data-bgnl-family></div>
+      <div>Copyright 2026. 양정고등학교 김용현. All Rights Reserved.</div>
+    </div>
   </div>
 </div>
 
@@ -1814,5 +1826,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 </script>
+<script src="https://bgnl.kr/family.js" defer></script>
 </body>
 </html>
